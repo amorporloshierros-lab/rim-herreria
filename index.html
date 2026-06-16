@@ -146,7 +146,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
 
 /* ===== barra de forja (progreso) ===== */
 .forge-bar{position:fixed;bottom:0;left:0;right:0;height:3px;background:var(--linea);z-index:90}
-.forge-bar .fill{height:100%;width:0;background:linear-gradient(90deg,var(--carbon),var(--fuego) 60%,var(--brasa));box-shadow:0 0 14px rgba(255,106,26,.6);transition:width .1s linear}
+.forge-bar .fill{position:relative;height:100%;width:0;background:linear-gradient(90deg,var(--carbon),var(--fuego) 55%,var(--brasa));box-shadow:0 0 20px 2px rgba(255,140,40,.8),0 0 7px rgba(255,240,210,.9);transition:width .1s linear}.fill::after{content:'';position:absolute;right:-3px;top:50%;transform:translateY(-50%);width:9px;height:9px;border-radius:50%;background:#fff7e6;box-shadow:0 0 12px 3px rgba(255,200,120,.95),0 0 28px 7px rgba(255,120,30,.7)}
 .stage-name{position:fixed;bottom:18px;left:44px;z-index:90;font-family:'Fraunces';font-style:italic;font-size:13px;color:var(--hueso-2);mix-blend-mode:difference}
 .stage-name b{color:var(--fuego);font-style:normal;font-family:'Archivo';font-weight:500;letter-spacing:1px;font-size:11px;text-transform:uppercase}
 
@@ -377,21 +377,41 @@ function setup(){
 if(!isMobile){
   // ----- chispas (solo si NO hay reduce-motion) -----
   let emit=function(){};
+  let weldX=0,weldHeat=0;
   if(!reduce){
     const cv=document.getElementById('sparks'),cx=cv.getContext('2d');
     let parts=[];
     function rsz(){cv.width=innerWidth;cv.height=innerHeight}
     rsz();window.addEventListener('resize',rsz);
-    emit=function(x,y){for(let i=0;i<3;i++)parts.push({x,y,vx:(Math.random()-.5)*4,vy:(Math.random()-1.5)*4,life:1,sz:Math.random()*2+1})};
+    emit=function(x,y,burst){
+      const n=burst||5;
+      for(let i=0;i<n;i++){
+        const ang=-Math.PI/2+(Math.random()-.5)*1.9, spd=Math.random()*5+2;
+        parts.push({x,y,vx:Math.cos(ang)*spd+(Math.random()-.5)*2,vy:Math.sin(ang)*spd,life:1,decay:Math.random()*.018+.016,sz:Math.random()*1.8+1.1,streak:Math.random()>.78});
+      }
+    };
+    function spcol(l){return l>.85?'#fff7e6':l>.6?'#ffd27a':l>.35?'#ff8a1e':'#d83a0a';}
     function loop(){
       cx.clearRect(0,0,cv.width,cv.height);
-      for(let i=parts.length-1;i>=0;i--){const p=parts[i];
-        p.x+=p.vx;p.y+=p.vy;p.vy+=.12;p.life-=.025;
-        if(p.life<=0){parts.splice(i,1);continue}
-        cx.globalAlpha=p.life;cx.fillStyle=p.life>.5?'#FFB347':'#FF6A1A';
-        cx.fillRect(p.x,p.y,p.sz,p.sz);
+      cx.globalCompositeOperation='lighter';
+      if(weldHeat>.01){
+        const gy=cv.height-2,r=70*weldHeat+18;
+        const g=cx.createRadialGradient(weldX,gy,0,weldX,gy,r);
+        g.addColorStop(0,'rgba(255,250,235,'+(.9*weldHeat)+')');
+        g.addColorStop(.25,'rgba(255,176,71,'+(.7*weldHeat)+')');
+        g.addColorStop(1,'rgba(255,106,26,0)');
+        cx.fillStyle=g;cx.beginPath();cx.arc(weldX,gy,r,0,7);cx.fill();
+        weldHeat*=.9;
       }
-      cx.globalAlpha=1;requestAnimationFrame(loop);
+      for(let i=parts.length-1;i>=0;i--){const p=parts[i];
+        p.x+=p.vx;p.y+=p.vy;p.vy+=.16;p.vx*=.985;p.life-=p.decay;
+        if(p.life<=0){parts.splice(i,1);continue}
+        const col=spcol(p.life);
+        cx.globalAlpha=p.life*.5;cx.fillStyle=col;cx.beginPath();cx.arc(p.x,p.y,p.sz*2.4,0,7);cx.fill();
+        cx.globalAlpha=p.life;cx.fillStyle=col;
+        if(p.streak){cx.fillRect(p.x,p.y,p.sz,p.sz+Math.abs(p.vy)*.8);}else{cx.beginPath();cx.arc(p.x,p.y,p.sz,0,7);cx.fill();}
+      }
+      cx.globalAlpha=1;cx.globalCompositeOperation='source-over';requestAnimationFrame(loop);
     }
     loop();
     const chispaPanel=document.getElementById('chispaPanel');
@@ -411,7 +431,7 @@ if(!isMobile){
     let acc=0,idx=0;
     for(let k=0;k<panels.length;k++){if(y+innerWidth*.4>=acc){idx=k}acc+=panels[k].offsetWidth}
     if(stages[idx])stageName.innerHTML='<b>'+stages[idx].n+'</b> &middot; '+stages[idx].d;
-    if(!reduce&&Math.random()>.6){emit(p*innerWidth,innerHeight-3)}
+    if(!reduce){weldX=p*innerWidth;weldHeat=1;emit(weldX,innerHeight-3,5+Math.round(Math.random()*5))}
   }
   window.addEventListener('scroll',onScroll,{passive:true});
 
